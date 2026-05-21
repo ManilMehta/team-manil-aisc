@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from pathlib import Path
 
 try:
     import albumentations as A
@@ -30,10 +31,35 @@ else:
 
 def load_rgb_image(path):
     """Load image and convert from BGR to RGB."""
+    # Prefer cv2.imread first (fast), but fall back to Windows-friendly
+    # read methods if it fails (handles unicode/long paths or corrupted files).
+    # 1) cv2.imread
     image = cv2.imread(path)
-    if image is None:
-        raise FileNotFoundError(f"Could not read image from {path}")
-    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    if image is not None:
+        return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # 2) np.fromfile + cv2.imdecode (works better on Windows with long/unicode paths)
+    try:
+        data = np.fromfile(path, dtype=np.uint8)
+        if data.size > 0:
+            image = cv2.imdecode(data, cv2.IMREAD_COLOR)
+            if image is not None:
+                return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    except Exception:
+        # fall through to PIL attempt
+        pass
+
+    # 3) PIL fallback (if available)
+    try:
+        from PIL import Image
+
+        pil = Image.open(path).convert("RGB")
+        return np.asarray(pil)
+    except Exception:
+        pass
+
+    # If all methods failed, raise a descriptive error so caller can decide to skip
+    raise FileNotFoundError(f"Could not read image from {path} using cv2, imdecode, or PIL")
 
 
 def preprocess_image(image):
@@ -115,12 +141,15 @@ def augment_dataset(X, y, flip_prob=0.5, brightness_limit=0.2):
     # Ensure the base dataset is resized before stacking.
     X = np.array([resize_image(img) if img.shape[:2] != TARGET_SIZE else img for img in X], dtype=np.uint8)
 
+    print(f"Augmenting {len(X)} images...")
     X_augmented = []
     y_augmented = []
 
     for i in range(len(X)):
         X_augmented.append(augment_image_uint8(X[i], flip_prob, brightness_limit))
         y_augmented.append(y[i])
+        if (i + 1) % 500 == 0 or i == len(X) - 1:
+            print(f"  augmented {i + 1}/{len(X)} images")
 
     X_augmented = np.array(X_augmented, dtype=np.uint8)
     y_augmented = np.array(y_augmented, dtype=y.dtype)
@@ -152,6 +181,65 @@ def augment_dataset_pair(X, X_g, y, flip_prob=0.5, brightness_limit=0.2):
     X_g_combined = np.vstack((X_g, X_g_augmented))
     y_combined = np.append(y, y_augmented)
     return X_combined, X_g_combined, y_combined
+
+
+def load_dataset(root_dir, verbose=True):
+    """Load all images and labels from a train folder structure."""
+    classes = [("benign", 0), ("malignant", 1)]
+    X = []
+    y = []
+    root_dir = Path(root_dir)
+
+    all_paths = []
+    for class_name, label in classes:
+        class_dir = root_dir / class_name
+        if not class_dir.exists():
+            raise FileNotFoundError(f"Training folder not found: {class_dir}")
+
+        for pattern in ["*.jpg", "*.jpeg", "*.png"]:
+            for image_path in sorted(class_dir.glob(pattern)):
+                all_paths.append((image_path, label))
+
+    if verbose:
+        print(f"Found {len(all_paths)} training images in {root_dir}")
+
+    for idx, (image_path, label) in enumerate(all_paths, start=1):
+        try:
+            image = load_rgb_image(str(image_path))
+        except Exception as e:
+            print(f"Warning: skipping unreadable image {image_path}: {e}")
+            continue
+
+        try:
+            image = resize_image(image)
+        except Exception as e:
+            print(f"Warning: failed to resize image {image_path}: {e}")
+            continue
+
+        X.append(image)
+        y.append(label)
+
+        if verbose and idx % 500 == 0:
+            print(f"  loaded {idx}/{len(all_paths)} images")
+
+    return np.array(X, dtype=np.uint8), np.array(y, dtype=np.int64)
+
+
+def save_augmented_images(X, y, output_root, prefix="aug"):
+    """Save augmented images to disk in class subfolders."""
+    output_root = Path(output_root)
+    classes = {0: "benign", 1: "malignant"}
+    for cls_name in classes.values():
+        (output_root / cls_name).mkdir(parents=True, exist_ok=True)
+
+    for idx, (image, label) in enumerate(zip(X, y), start=1):
+        cls_name = classes.get(int(label), str(label))
+        out_path = output_root / cls_name / f"{prefix}_{idx:06d}.jpg"
+        bgr = rgb_to_bgr(image)
+        if not cv2.imwrite(str(out_path), bgr):
+            raise IOError(f"Failed to save augmented image {out_path}")
+
+    return output_root
 
 
 def rgb_to_bgr(image):
@@ -186,18 +274,24 @@ def stack_images(images, labels):
 
 
 if __name__ == "__main__":
-    original = load_rgb_image(SAMPLE_PATH)
+    dataset_root = Path(__file__).resolve().parents[1] / "data" / "melanoma_cancer_dataset" / "train"
+    X, y = load_dataset(dataset_root, verbose=True)
 
-    resized = resize_image(original)
-    normalized = denormalize_image(normalize_image(resized))
-    augmented = denormalize_image(augment_image(original))
+    print(f"Loaded training images: {len(X)}")
+    print(f"Loaded labels: {y.shape}")
+    print("Starting augmentation of the full training dataset...")
 
-    comparison = stack_images(
-        [original, resized, normalized, augmented],
-        ["Original", "Resized 224x224", "Normalized", "Flip + Brightness"],
-    )
+    X_combined, y_combined = augment_dataset(X, y)
+    print(f"Augmented dataset: {X_combined.shape} (original + augmented)")
+    print(f"Augmented labels: {y_combined.shape}")
+    print(f"Original count: {len(X)}")
+    print(f"Augmented count: {len(X_combined) - len(X)}")
+    print(f"Total examples after augmentation: {len(X_combined)}")
 
-    cv2.imshow("OpenCV+NumPy Augmentation Pipeline", comparison)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    augmented_root = Path(__file__).resolve().parents[1] / "data" / "melanoma_cancer_dataset" / "train_augmented"
+    augmented_images = X_combined[len(X):]
+    augmented_labels = y_combined[len(X):]
+    print(f"Saving {len(augmented_images)} augmented images to {augmented_root} ...")
+    save_augmented_images(augmented_images, augmented_labels, augmented_root)
+    print(f"Saved augmented images to {augmented_root}")
 
