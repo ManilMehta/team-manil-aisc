@@ -1,5 +1,11 @@
-# Dataset
+# Data and artifacts
 data/
-
-# Kaggle downloads
+checkpoints/
 *.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
