@@ -62,10 +62,19 @@ The frontend calls `NEXT_PUBLIC_INFERENCE_API_URL` (defaults to
 5. In Vercel project settings, add env var
    `NEXT_PUBLIC_INFERENCE_API_URL=https://<your-backend-domain>`.
 
-### 4) Deploy backend API
+### 4) Deploy backend API on Render
 
-Deploy `api/inference_api.py` + `checkpoints/melanoma_best.keras` to a Python host
-(Render, Railway, Fly.io, etc.) and expose `/predict` + `/health`.
+1. Push repo to GitHub.
+2. In Render, click **New +** -> **Blueprint** and choose this repo.
+3. Render auto-detects `render.yaml` and creates `melanoma-inference-api`.
+4. Set `ALLOWED_ORIGINS` in Render to your frontend URL(s), comma-separated.
+   Example:
+   `https://your-app.vercel.app,https://www.yourdomain.com`
+5. Deploy and verify:
+   - `GET https://<render-service>.onrender.com/health`
+   - `POST https://<render-service>.onrender.com/predict`
+6. In Vercel env vars, set:
+   `NEXT_PUBLIC_INFERENCE_API_URL=https://<render-service>.onrender.com`
 
 ## Notes
 

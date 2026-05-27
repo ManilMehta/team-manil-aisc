@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: melanoma-inference-api
+    env: python
+    plan: starter
+    autoDeploy: true
+    buildCommand: pip install -r api/requirements.txt
+    startCommand: uvicorn api.inference_api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.10
+      - key: MODEL_CHECKPOINT_PATH
+        value: checkpoints/melanoma_best.keras
+      - key: ALLOWED_ORIGINS
+        sync: false

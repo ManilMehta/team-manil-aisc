@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from io import BytesIO
 from pathlib import Path
 
@@ -15,13 +16,22 @@ from PIL import Image, UnidentifiedImageError
 from datasets.load import CLASS_NAMES
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CHECKPOINT = ROOT / "checkpoints" / "melanoma_best.keras"
-IMAGE_SIZE = 224
+DEFAULT_CHECKPOINT = Path(
+    os.getenv("MODEL_CHECKPOINT_PATH", str(ROOT / "checkpoints" / "melanoma_best.keras"))
+)
+IMAGE_SIZE = int(os.getenv("IMAGE_SIZE", "224"))
+
+
+def _parse_allowed_origins() -> list[str]:
+    raw_origins = os.getenv("ALLOWED_ORIGINS", "*").strip()
+    if raw_origins == "*":
+        return ["*"]
+    return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 app = FastAPI(title="Melanoma Inference API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_parse_allowed_origins(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,8 +61,12 @@ def _preprocess(image_bytes: bytes) -> np.ndarray:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "checkpoint_exists": DEFAULT_CHECKPOINT.is_file(),
+        "model_loaded": _model is not None,
+    }
 
 
 @app.post("/predict")
