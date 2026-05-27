@@ -76,6 +76,30 @@ The frontend calls `NEXT_PUBLIC_INFERENCE_API_URL` (defaults to
 6. In Vercel env vars, set:
    `NEXT_PUBLIC_INFERENCE_API_URL=https://<render-service>.onrender.com`
 
+### 5) Deploy backend API on Hugging Face Spaces (free option)
+
+This repo includes a Docker Space backend in `hf_space/`.
+
+1. Create a new Space on Hugging Face:
+   - Space SDK: **Docker**
+   - Visibility: your choice
+2. Clone the Space repo locally and copy these folders/files into it:
+   - `api/`
+   - `hf_space/`
+   - `checkpoints/melanoma_best.keras`
+3. In the Space repo root, move `hf_space/README.md` to `README.md`.
+4. Ensure the root `Dockerfile` is `hf_space/Dockerfile` contents.
+5. Commit and push to the Space repo.
+6. Wait for Space build to finish, then test:
+   - `GET https://<space-subdomain>.hf.space/health`
+   - `POST https://<space-subdomain>.hf.space/predict`
+7. In Vercel env vars, set:
+   `NEXT_PUBLIC_INFERENCE_API_URL=https://<space-subdomain>.hf.space`
+8. Redeploy Vercel frontend.
+
+Note: If your model file is large, use Git LFS in the Space repo for
+`checkpoints/melanoma_best.keras`.
+
 ## Notes
 
 - This demo is for education/research and is not a medical diagnosis tool.

@@ -13,13 +13,12 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, UnidentifiedImageError
 
-from datasets.load import CLASS_NAMES
-
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CHECKPOINT = Path(
     os.getenv("MODEL_CHECKPOINT_PATH", str(ROOT / "checkpoints" / "melanoma_best.keras"))
 )
 IMAGE_SIZE = int(os.getenv("IMAGE_SIZE", "224"))
+CLASS_NAMES: tuple[str, str] = ("benign", "malignant")
 
 
 def _parse_allowed_origins() -> list[str]:
