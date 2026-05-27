@@ -1,48 +1,28 @@
 "use client";
 
-import * as tf from "@tensorflow/tfjs";
-
-const IMAGE_SIZE = 224;
-
-let cachedModel: tf.LayersModel | null = null;
-
 export type PredictionResult = {
   label: "benign" | "malignant";
   scores: Record<"benign" | "malignant", number>;
 };
 
-export async function loadMelanomaModel() {
-  if (cachedModel) return cachedModel;
-  cachedModel = await tf.loadLayersModel("/model/model.json");
-  return cachedModel;
-}
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_INFERENCE_API_URL ?? "http://127.0.0.1:8000";
 
 export async function predictImage(file: File): Promise<PredictionResult> {
-  const model = await loadMelanomaModel();
-  const imageBitmap = await createImageBitmap(file);
-  const tensor = tf.tidy(() => {
-    const image = tf.browser.fromPixels(imageBitmap).toFloat();
-    const resized = tf.image.resizeBilinear(image, [IMAGE_SIZE, IMAGE_SIZE]);
-    const normalized = resized.div(255);
-    return normalized.expandDims(0);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/predict`, {
+    method: "POST",
+    body: formData,
   });
 
-  try {
-    const output = model.predict(tensor) as tf.Tensor;
-    const probabilities = Array.from(await output.data());
-    output.dispose();
-
-    const scores = {
-      benign: probabilities[0] ?? 0,
-      malignant: probabilities[1] ?? 0,
-    };
-
-    const label = scores.malignant > scores.benign ? "malignant" : "benign";
-    return { label, scores };
-  } finally {
-    tensor.dispose();
-    imageBitmap.close();
+  if (!response.ok) {
+    throw new Error("Prediction request failed.");
   }
+
+  const data = (await response.json()) as PredictionResult;
+  return data;
 }
 
 export function formatPercent(value: number) {

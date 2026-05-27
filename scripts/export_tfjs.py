@@ -6,7 +6,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import tensorflow as tf
+
+# tensorflowjs 3.x still references removed NumPy aliases on newer NumPy.
+if not hasattr(np, "object"):
+    np.object = object  # type: ignore[attr-defined]
+if not hasattr(np, "bool"):
+    np.bool = bool  # type: ignore[attr-defined]
+
 import tensorflowjs as tfjs
 
 ROOT = Path(__file__).resolve().parent.parent

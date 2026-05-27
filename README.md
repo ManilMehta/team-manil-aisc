@@ -39,30 +39,33 @@ npm install
 npm run dev
 ```
 
-### 2) Export the Keras checkpoint to browser format
+### 2) Run backend inference API
 
-The web app expects:
-
-```text
-web/public/model/model.json
-web/public/model/*.bin
-```
-
-Export command:
+Start the Python backend from repo root:
 
 ```bash
-python /Users/manilmehta/team-manil-aisc/scripts/export_tfjs.py
+python -m venv .venv-api
+source .venv-api/bin/activate
+pip install -r api/requirements.txt
+uvicorn api.inference_api:app --host 0.0.0.0 --port 8000
 ```
 
-If the model files are missing, the UI shows a clear error message.
+The frontend calls `NEXT_PUBLIC_INFERENCE_API_URL` (defaults to
+`http://127.0.0.1:8000` for local dev).
 
-### 3) Deploy to Vercel
+### 3) Deploy frontend to Vercel
 
 1. Push this repo to GitHub.
 2. Import the project in Vercel and set the root directory to `web`.
 3. Build command: `npm run build`
 4. Output: Next.js default
-5. Ensure exported model files are in `web/public/model` before deploy.
+5. In Vercel project settings, add env var
+   `NEXT_PUBLIC_INFERENCE_API_URL=https://<your-backend-domain>`.
+
+### 4) Deploy backend API
+
+Deploy `api/inference_api.py` + `checkpoints/melanoma_best.keras` to a Python host
+(Render, Railway, Fly.io, etc.) and expose `/predict` + `/health`.
 
 ## Notes
 

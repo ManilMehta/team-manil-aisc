@@ -32,7 +32,7 @@ export default function Home() {
     } catch {
       setStatus("error");
       setError(
-        "Could not run prediction. Make sure /public/model/model.json exists (run export script first).",
+        "Could not run prediction. Ensure the backend inference API is running and NEXT_PUBLIC_INFERENCE_API_URL is set correctly.",
       );
     }
   }
@@ -43,8 +43,8 @@ export default function Home() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-semibold">Skin Lesion Demo</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Upload a lesion image to run your benign vs malignant classifier directly in
-            the browser.
+            Upload a lesion image to run your benign vs malignant classifier through the
+            inference API.
           </p>
 
           <label className="mt-6 block rounded-xl border border-dashed border-slate-300 p-4 text-sm">
